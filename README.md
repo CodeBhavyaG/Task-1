@@ -18,11 +18,13 @@ The API will be available at `http://localhost:8000`.
 |--------|----------|-------------|
 | GET | `/` | Root endpoint with API information |
 | GET | `/health` | Health check endpoint |
-| GET | `/tasks` | Retrieve all tasks |
+| GET | `/tasks` | Retrieve all tasks (supports `?done=true|false` and `?search=<text>` filters) |
 | GET | `/tasks/{task_id}` | Retrieve a specific task by ID |
 | POST | `/tasks` | Create a new task |
 | PUT | `/tasks/{task_id}` | Update an existing task |
 | DELETE | `/tasks/{task_id}` | Delete a task |
+| GET | `/stats` | Return counts: `{"total": N, "done": N, "open": N}` |
+| POST | `/reset` | Restore the original 3 seed tasks |
 
 ## Example Usage
 
@@ -59,3 +61,7 @@ This project uses:
 - Python 3.12+
 
 Dependencies are managed with UV and can be found in `pyproject.toml`.
+
+## The Mortality Experiment
+
+Tasks are stored only in the server's memory, so when I created a task and restarted the server, that task was gone — `GET /tasks` came back to the original three seed tasks with no memory of what I'd added. The data never touches a file or database, so every restart wipes the slate clean; this is exactly why Week 3 introduces persistent storage, so tasks survive a reboot.
