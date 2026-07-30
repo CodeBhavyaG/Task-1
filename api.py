@@ -95,19 +95,38 @@ async def create_task(task: dict):
 
 @app.put("/tasks/{task_id}")
 async def update_task(task_id: int, task: dict):
-    existing_task = next((t for t in data if t["id"] == task_id), None)
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
+    row = cursor.fetchone()
+
+    existing_task = dict(row) if row else None
     if existing_task is None:
         return JSONResponse(status_code=404, content={ "error": f"Task {task_id} not found" })
     if task.get("title") is None and task.get("done") is None:
         return JSONResponse(status_code=400, content={ "error": "Title and done status are required" })
 
-    existing_task.update(task)
+    cursor.execute(
+        "UPDATE task SET title = COALESCE(?, title), done = COALESCE(?, done) WHERE id = ?",
+        (task.get("title"), task.get("done"), task_id)
+    )
+    conn.commit()
+    conn.close()
     return JSONResponse(status_code=200, content={ "message": f"Task {task_id} updated successfully" })
+
 
 @app.delete("/tasks/{task_id}")
 async def delete_task(task_id: int):
-    existing_task = next((t for t in data if t["id"] == task_id), None)
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
+    row = cursor.fetchone()
+
+
+    existing_task = dict(row) if row else None
     if existing_task is None:
         return JSONResponse(status_code=404, content={ "error": f"Task {task_id} not found" })
-    data.remove(existing_task)
-    return JSONResponse(status_code=200, content={ "message": f"Task {task_id} deleted successfully" })
+    cursor.execute("DELETE FROM task WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    return JSONResponse(status_code=204, content={ "message": f"Task {task_id} deleted successfully" })
