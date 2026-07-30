@@ -79,12 +79,18 @@ async def health():
 
 @app.post("/tasks")
 async def create_task(task: dict):
-    new_id = len(data) + 1
+    conn = db.get_connection()
+    cursor = conn.cursor()
 
     if task.get("title") is None:
         return JSONResponse(status_code=400, content={ "error": "Title is required" })
-    data.append({"id": new_id, "title": task["title"], "done": task.get("done", False)})
-    return JSONResponse(status_code=201, content={ "message": f"Task {new_id} created successfully" })
+    cursor.execute(
+        "INSERT INTO task (title, done) VALUES (?, ?)",
+        (task["title"], False))
+
+    conn.commit()
+    conn.close()
+    return JSONResponse(status_code=201, content={ "message": "Task created successfully" })
 
 
 @app.put("/tasks/{task_id}")
