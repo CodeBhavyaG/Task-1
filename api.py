@@ -47,8 +47,13 @@ async def get_tasks(done: Optional[bool] = None, search: Optional[str] = None) -
 
 
 @app.get("/tasks/{task_id}")
-async def get_task(task_id: int):
-    task = next((task for task in data if task["id"] == task_id), None)
+async def get_task(task_id: int) -> JSONResponse:
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
+    row = cursor.fetchone()
+    conn.close()
+    task = dict(row) if row else None
     if task:
         return JSONResponse(status_code=200, content=task)
     return JSONResponse(status_code=404, content={ "error": f"Task {task_id} not found" })
