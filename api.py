@@ -18,7 +18,6 @@ SEED = [
     {"id": 3, "title": "Task 3", "done": False},
 ]
 
-data = [dict(task) for task in SEED]
 
 @app.get("/")
 async def root():
@@ -61,15 +60,29 @@ async def get_task(task_id: int) -> JSONResponse:
 
 @app.get("/stats")
 async def get_stats():
-    total = len(data)
-    done = sum(1 for task in data if task["done"])
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM task")
+    total = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM task WHERE done = 1")
+    done = cursor.fetchone()[0]
+    conn.close()
     return { "total": total, "done": done, "open": total - done }
 
 
 @app.post("/reset")
 async def reset_tasks():
-    data[:] = [dict(task) for task in SEED]
-    return JSONResponse(status_code=200, content={ "message": "Tasks reset to seed data", "count": len(data) })
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM task")
+    for task in SEED:
+        cursor.execute(
+            "INSERT INTO task (id, title, done) VALUES (?, ?, ?)",
+            (task["id"], task["title"], task["done"])
+        )
+    conn.commit()
+    conn.close()
+    return JSONResponse(status_code=200, content={ "message": "Tasks reset to seed data", "count": len(SEED) })
 
 
 @app.get("/health")

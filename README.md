@@ -114,4 +114,6 @@ Tasks are stored in a SQLite database (`tasks.db`), so they **survive server res
 2. Task 2 — done
 3. Task 3 — not done
 
+![Database schema](db.png)
+
 Use `POST /reset` to restore this initial state.
