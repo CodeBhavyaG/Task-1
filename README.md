@@ -5,6 +5,12 @@ A simple RESTful API for managing tasks built with FastAPI and SQLite. This API 
 ## Quick Start
 
 ```bash
+# Run postgras database
+docker run --name taskdb -e POSTGRES_PASSWORD=your-passwd -e POSTGRES_DB=tasks \
+-p 5432:5432 -v taskdata:/var/lib/postgresql/data -d postgres
+```
+
+```bash
 # Clone and run (one command)
 uv run main.py
 ```
