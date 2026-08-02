@@ -71,7 +71,7 @@ def init_db():
                 print("Database already contains data, skipping seed insertion.")
 
             # Update the sequence for the id column to avoid duplicate key errors
-           # cursor.execute("SELECT setval(pg_get_serial_sequence('tasks', 'id'), COALESCE(MAX(id), 0) + 1) FROM tasks;")
+            cursor.execute("SELECT setval(pg_get_serial_sequence('tasks', 'id'), COALESCE(MAX(id), 1)) FROM tasks;")
             connection.commit()
             connection.close()
 
