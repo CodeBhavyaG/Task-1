@@ -35,7 +35,6 @@ def init_db():
         cursor = connection.cursor()
 
         # Query the system master table for a specific table name
-        table_name = "tasks"
 
         create_table_query = """
             CREATE TABLE IF NOT EXISTS tasks (
@@ -60,19 +59,22 @@ def init_db():
             row_count = cursor.fetchall()[0]
 
             # Only insert seed data if table is empty
-            if row_count == 0:
+            if row_count['count'] == 0:
                 # Insert seed data using parameterized queries
                 for task in seed_data:
                     cursor.execute(
                         "INSERT INTO tasks (id, title, done) VALUES (%s, %s, %s)",
                         (task['id'], task['title'], task['done'])
                     )
-                connection.commit()
                 print("Seed data inserted successfully.")
             else:
                 print("Database already contains data, skipping seed insertion.")
 
+            # Update the sequence for the id column to avoid duplicate key errors
+           # cursor.execute("SELECT setval(pg_get_serial_sequence('tasks', 'id'), COALESCE(MAX(id), 0) + 1) FROM tasks;")
+            connection.commit()
             connection.close()
+
         except Exception as e:
             print(f"Error during database operations: {e}")
             if not connection.closed:

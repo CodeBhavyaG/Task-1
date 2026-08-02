@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Response
 from fastapi.responses import JSONResponse
 from typing import Any, Generator, Optional
 import db
@@ -58,44 +58,50 @@ async def get_task(task_id: int) -> JSONResponse:
 @app.get("/stats")
 async def get_stats():
     conn = db.get_connection()
+    if not conn:
+        return JSONResponse(status_code=500, content={ "error": "Database connection failed" })
+    
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM task")
-    total = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM task WHERE done = 1")
-    done = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM tasks")
+    total = cursor.fetchone()['count']
+    cursor.execute("SELECT COUNT(*) FROM tasks WHERE done = TRUE")
+    done = cursor.fetchone()['count']
     conn.close()
-    return { "total": total, "done": done, "open": total - done }
+    return JSONResponse(status_code=200, content={ "total": total, "done": done, "open": total - done })
 
 
 @app.post("/reset")
 async def reset_tasks():
     conn = db.get_connection()
+    if not conn:
+        return JSONResponse(status_code=500, content={ "error": "Database connection failed" })
+    
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM task")
-    for task in SEED:
+    cursor.execute("DELETE FROM tasks")
+    for task in db.seed_data:
         cursor.execute(
-            "INSERT INTO task (id, title, done) VALUES (?, ?, ?)",
+            "INSERT INTO tasks (id, title, done) VALUES (%s, %s, %s)",
             (task["id"], task["title"], task["done"])
         )
     conn.commit()
     conn.close()
-    return JSONResponse(status_code=200, content={ "message": "Tasks reset to seed data", "count": len(SEED) })
+    return JSONResponse(status_code=200, content={ "message": "Tasks reset to seed data", "count": len(db.seed_data) })
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     return { "status": "ok" }
 
 
 @app.post("/tasks")
-async def create_task(task: dict):
+async def create_task(task: dict) -> JSONResponse:
     conn = db.get_connection()
     cursor = conn.cursor()
 
     if task.get("title") is None:
         return JSONResponse(status_code=400, content={ "error": "Title is required" })
     cursor.execute(
-        "INSERT INTO task (title, done) VALUES (?, ?)",
+        "INSERT INTO tasks (title, done) VALUES (%s, %s)",
         (task["title"], False))
 
     conn.commit()
@@ -104,11 +110,11 @@ async def create_task(task: dict):
 
 
 @app.put("/tasks/{task_id}")
-async def update_task(task_id: int, task: dict):
+async def update_task(task_id: int, task: dict) -> JSONResponse:
     conn = db.get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
-    row = cursor.fetchone()
+    cursor.execute("SELECT * FROM tasks WHERE id = %s", (task_id,))
+    row = cursor.fetchall()[0]
 
     existing_task = dict(row) if row else None
     if existing_task is None:
@@ -117,7 +123,7 @@ async def update_task(task_id: int, task: dict):
         return JSONResponse(status_code=400, content={ "error": "Title and done status are required" })
 
     cursor.execute(
-        "UPDATE task SET title = COALESCE(?, title), done = COALESCE(?, done) WHERE id = ?",
+        "UPDATE tasks SET title = COALESCE(%s, title), done = COALESCE(%s, done) WHERE id = %s",
         (task.get("title"), task.get("done"), task_id)
     )
     conn.commit()
@@ -126,17 +132,17 @@ async def update_task(task_id: int, task: dict):
 
 
 @app.delete("/tasks/{task_id}")
-async def delete_task(task_id: int):
+async def delete_task(task_id: int) -> JSONResponse:
     conn = db.get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
-    row = cursor.fetchone()
+    cursor.execute("SELECT * FROM tasks WHERE id = %s", (task_id,))
+    row = cursor.fetchall()[0]
 
 
     existing_task = dict(row) if row else None
     if existing_task is None:
         return JSONResponse(status_code=404, content={ "error": f"Task {task_id} not found" })
-    cursor.execute("DELETE FROM task WHERE id = ?", (task_id,))
+    cursor.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
     conn.commit()
     conn.close()
-    return JSONResponse(status_code=204, content={ "message": f"Task {task_id} deleted successfully" })
+    return Response(status_code=204)
