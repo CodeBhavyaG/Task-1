@@ -12,12 +12,6 @@ async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
 
 app = FastAPI(lifespan=lifespan)
 
-SEED = [
-    {"id": 1, "title": "Task 1", "done": False},
-    {"id": 2, "title": "Task 2", "done": True},
-    {"id": 3, "title": "Task 3", "done": False},
-]
-
 
 @app.get("/")
 async def root():
@@ -29,17 +23,17 @@ async def get_tasks(done: Optional[bool] = None, search: Optional[str] = None) -
     conn = db.get_connection()
     cursor = conn.cursor()
 
-    query = "SELECT * FROM task WHERE 1=1"
-    params = []
+    if not conn:
+        return JSONResponse(status_code=500, content={ "error": "Database connection failed" })
+
+    query = "SELECT * FROM tasks WHERE 1=1"
 
     if done is not None:
-        query += " AND done = ?"
-        params.append(int(done))
+        query += f" AND done = {done}"
     if search is not None:
-        query += " AND LOWER(title) LIKE ?"
-        params.append(f"%{search.lower()}%")
+        query += f" AND LOWER(title) LIKE '%{search.lower()}%'"
 
-    cursor.execute(query, params)
+    cursor.execute(query)
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return results

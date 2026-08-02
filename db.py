@@ -1,4 +1,16 @@
 import sqlite3
+import psycopg
+import psycopg.rows
+import dotenv
+import os
+
+dotenv.load_dotenv()
+
+user = dotenv.get_key(".env", "POSTGRES_USER")
+password = dotenv.get_key(".env", "POSTGRES_PASSWORD")
+
+db_url = os.environ.get("DATABASE_URL", "postgres://postgres:dev@localhost:5432/tasks")
+
 
 seed_data = [
     {"id": 1, "title": "Task 1", "done": False},
@@ -7,47 +19,49 @@ seed_data = [
 ]
 
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect("tasks.db")
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_connection() -> psycopg.Connection[psycopg.rows.DictRow] | None:
+    try:
+        conn = psycopg.connect(db_url, row_factory=psycopg.rows.dict_row)
+        return conn
+    except Exception as e:
+        print(f"Error connecting to PostgreSQL: {e}")
+        return None
 
 
 def init_db():
-    connection = sqlite3.connect("tasks.db")
-    cursor = connection.cursor()
 
-    # Query the system master table for a specific table name
-    table_name = "task"
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        (table_name,)
-    )
+    try:
+        connection = psycopg.connect(db_url, row_factory=psycopg.rows.dict_row)
+        cursor = connection.cursor()
+
+        # Query the system master table for a specific table name
+        table_name = "tasks"
+
+        create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id SERIAL PRIMARY KEY,
+                title TEXT,
+                done BOOLEAN
+            );
+            """
+        cursor.execute(create_table_query)
+        connection.commit()
+        print("Table 'tasks' created successfully (or already exists).")
+    except Exception as e:
+        print(f"Error connecting to PostgreSQL: {e}")
+        print("Falling back to SQLite database.")
 
     # Fetch the result
-    if not cursor.fetchone():
-        # Table does not exist, create it
-        print(f"Table '{table_name}' does not exist. Creating the table.")
-        cursor.execute(
-            """
-            CREATE TABLE task (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                done BOOLEAN NOT NULL CHECK (done IN (0, 1))
-            )
-            """
-        )
-
     cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-    row_count = cursor.fetchone()[0]
+    row_count = cursor.fetchall()[0]
 
     if row_count == 0:
         cursor.execute(f"DELETE FROM {table_name}")
-        # Insert seed data
+
+    # Insert seed data
         for task in seed_data:
             cursor.execute(
-                "INSERT INTO task (id, title, done) VALUES (?, ?, ?)",
-                (task["id"], task["title"], task["done"])
+                f"INSERT INTO {table_name} (id, title, done) VALUES ({task['id']}, '{task['title']}', {task['done']})"
             )
 
     connection.commit()
