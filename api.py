@@ -19,7 +19,7 @@ async def root():
 
 
 @app.get("/tasks")
-async def get_tasks(done: Optional[bool] = None, search: Optional[str] = None) -> list[dict[Any, Any]]:
+async def get_tasks(done: Optional[bool] = None, search: Optional[str] = None) -> JSONResponse:
     conn = db.get_connection()
     cursor = conn.cursor()
 
@@ -27,23 +27,26 @@ async def get_tasks(done: Optional[bool] = None, search: Optional[str] = None) -
         return JSONResponse(status_code=500, content={ "error": "Database connection failed" })
 
     query = "SELECT * FROM tasks WHERE 1=1"
+    params = []
 
     if done is not None:
-        query += f" AND done = {done}"
+        query += f" AND done = %s"
+        params.append(done)
     if search is not None:
-        query += f" AND LOWER(title) LIKE '%{search.lower()}%'"
+        query += f" AND LOWER(title) LIKE %s"
+        params.append(f"%{search.lower()}%")
 
-    cursor.execute(query)
+    cursor.execute(query, params)
     results = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return results
+    return JSONResponse(status_code=200, content=results)
 
 
 @app.get("/tasks/{task_id}")
 async def get_task(task_id: int) -> JSONResponse:
     conn = db.get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM task WHERE id = ?", (task_id,))
+    cursor.execute("SELECT * FROM tasks WHERE id = %s", (task_id,))
     row = cursor.fetchone()
     conn.close()
     task = dict(row) if row else None
