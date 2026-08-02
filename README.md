@@ -1,30 +1,34 @@
 # Task API
 
-A simple RESTful API for managing tasks built with FastAPI and SQLite. This API provides full CRUD (Create, Read, Update, Delete) operations for a task list with persistent storage.
+A simple RESTful API for managing tasks built with FastAPI and PostgreSQL. This API provides full CRUD (Create, Read, Update, Delete) operations for a task list with persistent storage.
 
-## Quick Start
-
-```bash
-# Run postgras database
-docker run --name taskdb -e POSTGRES_PASSWORD=your-passwd -e POSTGRES_DB=tasks \
--p 5432:5432 -v taskdata:/var/lib/postgresql/data -d postgres
-```
+## Quick Start with Docker Compose (Recommended)
 
 ```bash
-# Clone and run (one command)
-uv run main.py
+# Clone and run
+docker-compose up --build
 ```
 
 The API will be available at `http://localhost:8000`.
 
 **What happens automatically:**
-- Virtual environment created (if missing)
-- Dependencies installed (`fastapi`, `uvicorn`, `sqlite3`)
-- SQLite database `tasks.db` created automatically on first run
-- `task` table created with 3 seed tasks
-- Auto-reload enabled for development
+- PostgreSQL database started in a container
+- API server started with uv
+- Dependencies installed (`fastapi`, `uvicorn`, `psycopg`)
+- Database initialized with 3 seed tasks
+- Health checks ensure database is ready before API starts
 
-No manual database setup or `uv sync` required — `uv run` handles everything.
+## Local Development (without Docker)
+
+```bash
+# Start PostgreSQL locally (or use existing instance)
+# Update .env with your DATABASE_URL
+
+# Install dependencies and run
+uv run uvicorn api:app --reload
+```
+
+The API will be available at `http://localhost:8000`.
 
 ## API Endpoints
 
@@ -81,26 +85,26 @@ Interactive API documentation is available at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-![Swagger UI](swagger.png)
-
 ## Project Structure
 
 ```
 Task-1/
-├── api.py          # FastAPI routes & business logic
-├── db.py           # SQLite connection & initialization
-├── main.py         # Entry point (uvicorn server)
-├── tasks.db        # SQLite database (auto-created)
-├── pyproject.toml  # Project metadata & dependencies
-├── uv.lock         # Locked dependencies
-└── README.md       # This file
+├── api.py              # FastAPI routes & business logic
+├── db.py               # PostgreSQL connection & initialization
+├── docker-compose.yml  # Docker Compose configuration
+├── Dockerfile          # Docker image definition
+├── pyproject.toml      # Project metadata & dependencies
+├── uv.lock             # Locked dependencies
+├── .env                # Environment variables
+└── README.md           # This file
 ```
 
 ## Development
 
 This project uses:
-- FastAPI 0.115+
-- Uvicorn 0.32+
+- FastAPI 0.139+
+- Uvicorn 0.51+
+- psycopg 3.3+
 - Python 3.12+
 - UV for package management
 
@@ -109,17 +113,22 @@ Dependencies are managed with UV and can be found in `pyproject.toml`.
 ### Run with auto-reload (development)
 
 ```bash
-uv run uvicorn main:app --reload
+uv run uvicorn api:app --reload
 ```
 
 ## Persistence
 
-Tasks are stored in a SQLite database (`tasks.db`), so they **survive server restarts**. The database is initialized automatically on first run with three seed tasks:
+Tasks are stored in a PostgreSQL database, so they **survive server restarts**. The database is initialized automatically on first run with three seed tasks:
 
 1. Task 1 — not done
 2. Task 2 — done
 3. Task 3 — not done
 
-![Database schema](db.png)
-
 Use `POST /reset` to restore this initial state.
+
+## Configuration
+
+Environment variables (in `.env`):
+- `POSTGRES_USER` - Database username
+- `POSTGRES_PASSWORD` - Database password
+- `DATABASE_URL` - Full PostgreSQL connection string
