@@ -3,8 +3,16 @@ import psycopg
 import psycopg.rows
 import dotenv
 import os
+from supabase import create_client, Client
+
 
 dotenv.load_dotenv()
+
+
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
 
 user = dotenv.get_key(".env", "POSTGRES_USER")
 password = dotenv.get_key(".env", "POSTGRES_PASSWORD")
