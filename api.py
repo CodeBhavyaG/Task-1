@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query, Response
 from fastapi.responses import JSONResponse
 from typing import Any, Generator, Optional
+from supabase_auth.errors import AuthError
 import db
 
 from contextlib import asynccontextmanager
@@ -15,7 +16,7 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
-    return { "name": "Task API", "version": "1.0", "endpoints": ["/", "/health", "/tasks", "/tasks/{task_id}", "/stats", "/reset"] }
+    return { "name": "Task API", "version": "1.0", "endpoints": ["/", "/health", "/auth/signup", "/auth/login", "/tasks", "/tasks/{task_id}", "/stats", "/reset"] }
 
 
 @app.get("/tasks")
@@ -91,6 +92,48 @@ async def reset_tasks():
 @app.get("/health")
 async def health() -> dict[str, str]:
     return { "status": "ok" }
+
+
+@app.post("/auth/signup")
+async def signup(body: dict) -> JSONResponse:
+    email = body.get("email")
+    password = body.get("password")
+
+    if not email or not password:
+        return JSONResponse(status_code=400, content={ "error": "Bad Request" })
+
+    try:
+        res = db.supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+        })
+    except AuthError as e:
+        return JSONResponse(status_code=400, content={ "error": e.message })
+
+    user = res.user.model_dump(mode="json") if res.user else None
+    return JSONResponse(status_code=201, content=user)
+
+
+@app.post("/auth/login")
+async def login(body: dict) -> JSONResponse:
+    email = body.get("email")
+    password = body.get("password")
+
+    if not email or not password:
+        return JSONResponse(status_code=400, content={ "error": "Bad Request" })
+
+    try:
+        res = db.supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+    except AuthError:
+        return JSONResponse(status_code=401, content={ "error": "Invalid login credentials" })
+
+    return JSONResponse(status_code=200, content={
+        "access_token": res.session.access_token,
+        "refresh_token": res.session.refresh_token,
+    })
 
 
 @app.post("/tasks")

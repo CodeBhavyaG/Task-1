@@ -36,6 +36,8 @@ The API will be available at `http://localhost:8000`.
 |--------|----------|-------------|
 | GET | `/` | Root endpoint with API information |
 | GET | `/health` | Health check endpoint |
+| POST | `/auth/signup` | Register a new user via Supabase (JSON: `{"email": "...", "password": "..."}`) → 201 with user object |
+| POST | `/auth/login` | Log in via Supabase (JSON: `{"email": "...", "password": "..."}`) → 200 with `access_token` & `refresh_token` |
 | GET | `/tasks` | Retrieve all tasks (supports `?done=true|false` and `?search=<text>` filters) |
 | GET | `/tasks/{task_id}` | Retrieve a specific task by ID |
 | POST | `/tasks` | Create a new task (JSON: `{"title": "string", "done": false}`) |
@@ -63,6 +65,16 @@ curl http://localhost:8000/tasks/1
 curl -X POST http://localhost:8000/tasks \
   -H "Content-Type: application/json" \
   -d '{"title": "New task", "done": false}'
+
+# Register a new user
+curl -i -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+# Log in (returns access_token & refresh_token)
+curl -i -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
 
 # Update a task (partial updates supported)
 curl -X PUT http://localhost:8000/tasks/1 \
