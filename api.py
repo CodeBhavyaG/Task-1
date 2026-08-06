@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Response
+from fastapi import FastAPI, Query, Response, Header
 from fastapi.responses import JSONResponse
 from typing import Any, Generator, Optional
 from supabase_auth.errors import AuthError
@@ -61,7 +61,7 @@ async def get_stats():
     conn = db.get_connection()
     if not conn:
         return JSONResponse(status_code=500, content={ "error": "Database connection failed" })
-    
+
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM tasks")
     total = cursor.fetchone()['count']
@@ -76,7 +76,7 @@ async def reset_tasks():
     conn = db.get_connection()
     if not conn:
         return JSONResponse(status_code=500, content={ "error": "Database connection failed" })
-    
+
     cursor = conn.cursor()
     cursor.execute("DELETE FROM tasks")
     for task in db.seed_data:
@@ -189,3 +189,21 @@ async def delete_task(task_id: int) -> JSONResponse:
     conn.commit()
     conn.close()
     return Response(status_code=204)
+
+@app.get("/public/info")
+async def get_info() -> JSONResponse:
+    return JSONResponse(status_code=200, content={ "message": "Welcome stranger! This info is public." })
+
+@app.get("/protected/profile")
+async def get_profile(authorization: Optional[str] = Header(default=None)) -> JSONResponse:
+    # Client must send the access token as: Authorization: Bearer <token>
+    if not authorization:
+        return JSONResponse(status_code=401, content={ "error": "token required" })
+
+    parts = authorization.split(" ")
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+        return JSONResponse(status_code=401, content={ "error": "token required" })
+
+    token = parts[1]
+    # Token is NOT verified yet - just confirming one was presented.
+    return JSONResponse(status_code=200, content={ "message": "Profile accessed", "token": token })
