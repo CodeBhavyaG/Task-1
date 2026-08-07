@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Response, Header
+from fastapi import FastAPI, Query, Response, Header, Depends, Request
 from fastapi.responses import JSONResponse
 from typing import Any, Generator, Optional
 from supabase_auth.errors import AuthError
@@ -12,6 +12,19 @@ async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+
+class Unauthorized(Exception):
+    """Raised by the auth guard to short-circuit a protected route with a 401."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+
+@app.exception_handler(Unauthorized)
+async def unauthorized_handler(request: Request, exc: Unauthorized) -> JSONResponse:
+    return JSONResponse(status_code=401, content={ "error": exc.message })
 
 
 @app.get("/")
@@ -194,15 +207,20 @@ async def delete_task(task_id: int) -> JSONResponse:
 async def get_info() -> JSONResponse:
     return JSONResponse(status_code=200, content={ "message": "Welcome stranger! This info is public." })
 
-@app.get("/protected/profile")
-async def get_profile(authorization: Optional[str] = Header(default=None)) -> JSONResponse:
-    # Client must send the access token as: Authorization: Bearer <token>
+def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict[str, Any]:
+    """Reusable dependency guarding protected routes.
+
+    Verifies the Bearer token from the Authorization header against Supabase,
+    then returns the authenticated user's metadata so routes can use
+    `user: dict = Depends(get_current_user)`. On any auth failure it raises
+    Unauthorized, so the route body never runs for unauthenticated calls.
+    """
     if not authorization:
-        return JSONResponse(status_code=401, content={ "error": "token required" })
+        raise Unauthorized("token required")
 
     parts = authorization.split(" ")
     if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
-        return JSONResponse(status_code=401, content={ "error": "token required" })
+        raise Unauthorized("token required")
 
     token = parts[1]
 
@@ -211,14 +229,32 @@ async def get_profile(authorization: Optional[str] = Header(default=None)) -> JS
     try:
         res = db.supabase.auth.get_user(token)
     except AuthError:
-        return JSONResponse(status_code=401, content={ "error": "Invalid or expired token" })
+        raise Unauthorized("Invalid or expired token")
 
     if res is None or res.user is None:
-        return JSONResponse(status_code=401, content={ "error": "Invalid or expired token" })
+        raise Unauthorized("Invalid or expired token")
 
-    user = res.user.model_dump(mode="json")
+    return res.user.model_dump(mode="json")
+
+
+@app.get("/protected/profile")
+async def get_profile(user: dict = Depends(get_current_user)) -> JSONResponse:
     return JSONResponse(status_code=200, content={
         "id": user.get("id"),
         "email": user.get("email"),
         "created_at": user.get("created_at"),
+    })
+
+
+@app.post("/auth/logout")
+async def logout(user: dict = Depends(get_current_user)) -> Response:
+    # Guard already verified the token; now sign out on Supabase's side.
+    db.supabase.auth.sign_out()
+    return Response(status_code=204)
+
+@app.get("/protected/dashboard")
+async def get_dashboard(user: dict = Depends(get_current_user)) -> JSONResponse:
+    return JSONResponse(status_code=200, content={
+        "message": "Welcome to your dashboard!",
+        "user_email": user.get("email"),
     })
