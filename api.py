@@ -205,5 +205,20 @@ async def get_profile(authorization: Optional[str] = Header(default=None)) -> JS
         return JSONResponse(status_code=401, content={ "error": "token required" })
 
     token = parts[1]
-    # Token is NOT verified yet - just confirming one was presented.
-    return JSONResponse(status_code=200, content={ "message": "Profile accessed", "token": token })
+
+    # Ask Supabase whether the token is real. This is a network call, so the
+    # answer is trustworthy (handles expiry, tampering, and invalid tokens).
+    try:
+        res = db.supabase.auth.get_user(token)
+    except AuthError:
+        return JSONResponse(status_code=401, content={ "error": "Invalid or expired token" })
+
+    if res is None or res.user is None:
+        return JSONResponse(status_code=401, content={ "error": "Invalid or expired token" })
+
+    user = res.user.model_dump(mode="json")
+    return JSONResponse(status_code=200, content={
+        "id": user.get("id"),
+        "email": user.get("email"),
+        "created_at": user.get("created_at"),
+    })
