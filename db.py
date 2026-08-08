@@ -1,16 +1,19 @@
-import sqlite3
+import os
+
+import dotenv
 import psycopg
 import psycopg.rows
-import dotenv
-import os
-from supabase import create_client, Client
-
+from supabase import Client, create_client
 
 dotenv.load_dotenv()
 
 
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+url: str | None = os.environ.get("SUPABASE_URL")
+key: str | None = os.environ.get("SUPABASE_KEY")
+
+if url is None or key is None:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_KEY must be set in the environment.")
+
 supabase: Client = create_client(url, key)
 
 
@@ -67,19 +70,21 @@ def init_db():
             row_count = cursor.fetchall()[0]
 
             # Only insert seed data if table is empty
-            if row_count['count'] == 0:
+            if row_count["count"] == 0:
                 # Insert seed data using parameterized queries
                 for task in seed_data:
                     cursor.execute(
                         "INSERT INTO tasks (id, title, done) VALUES (%s, %s, %s)",
-                        (task['id'], task['title'], task['done'])
+                        (task["id"], task["title"], task["done"]),
                     )
                 print("Seed data inserted successfully.")
             else:
                 print("Database already contains data, skipping seed insertion.")
 
             # Update the sequence for the id column to avoid duplicate key errors
-            cursor.execute("SELECT setval(pg_get_serial_sequence('tasks', 'id'), COALESCE(MAX(id), 1)) FROM tasks;")
+            cursor.execute(
+                "SELECT setval(pg_get_serial_sequence('tasks', 'id'), COALESCE(MAX(id), 1)) FROM tasks;"
+            )
             connection.commit()
             connection.close()
 
